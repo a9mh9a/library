@@ -1,11 +1,362 @@
 ﻿<!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>نظام المكتبة</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Library Pro Elite v2</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4361ee">
+    <link rel="icon" type="image/png" href="icon.png">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4361ee; --bg-color: #f0f2f5; --card-bg: #ffffff;
+            --text-main: #212529; --text-sub: #6c757d; --border: #edf2f7;
+            --danger: #ef233c; --success: #2ec4b6; --warning: #ff9f1c;
+        }
+        [data-theme="dark"] {
+            --bg-color: #1a1c23; --card-bg: #242731; --text-main: #f8f9fa;
+            --text-sub: #adb5bd; --border: #323644;
+        }
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; transition: background 0.2s; }
+        body { margin: 0; background: var(--bg-color); color: var(--text-main); overflow-x: hidden; user-select: none; }
+        .hidden { display: none !important; }
+
+        /* Login Screen */
+        #login-screen {
+            position: fixed; inset: 0; background: linear-gradient(135deg, #4361ee, #3f37c9);
+            display: flex; align-items: center; justify-content: center; z-index: 5000;
+        }
+        .login-card { background: white; padding: 2.5rem; border-radius: 20px; width: 90%; max-width: 400px; text-align: center; color: #333; }
+
+        /* Layout */
+        .header { background: var(--card-bg); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.05); position: sticky; top: 0; z-index: 1000; }
+        .main-container { padding: 15px; max-width: 1200px; margin: 0 auto; padding-bottom: 100px; }
+        .card { background: var(--card-bg); border-radius: 15px; padding: 18px; margin-bottom: 15px; border: 1px solid var(--border); }
+
+        /* POS Grid */
+        .pos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
+        .product-item { background: var(--card-bg); border-radius: 12px; padding: 12px; text-align: center; border: 1px solid var(--border); cursor: pointer; }
+        .stock-badge { font-size: 0.75rem; background: #eee; color: #555; padding: 2px 8px; border-radius: 10px; margin-top: 5px; display: inline-block; }
+
+        /* Navigation */
+        .bottom-nav { position: fixed; bottom: 0; width: 100%; background: var(--card-bg); display: flex; justify-content: space-around; padding: 10px 0; border-top: 1px solid var(--border); z-index: 2000; }
+        .nav-item { flex: 1; border: none; background: none; color: var(--text-sub); display: flex; flex-direction: column; align-items: center; font-size: 0.7rem; cursor: pointer; }
+        .nav-item.active { color: var(--primary); font-weight: bold; }
+        .nav-item i { font-size: 1.3rem; margin-bottom: 4px; }
+
+        /* Elements */
+        .form-control { width: 100%; padding: 12px; border: 1.5px solid var(--border); border-radius: 10px; margin-bottom: 15px; background: var(--bg-color); color: var(--text-main); }
+        .btn { border: none; padding: 12px; border-radius: 10px; cursor: pointer; font-weight: bold; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn-main { background: var(--primary); color: white; }
+        
+        #cart-drawer { position: fixed; bottom: 80px; left: 15px; right: 15px; background: var(--primary); color: white; border-radius: 15px; padding: 15px; display: flex; justify-content: space-between; align-items: center; transform: translateY(200%); transition: 0.4s; z-index: 1500; }
+        #cart-drawer.active { transform: translateY(0); }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 15px; }
+        .modal-body { background: var(--card-bg); width: 100%; max-width: 450px; border-radius: 20px; padding: 25px; }
+        
+        /* Sales Log Table */
+        .log-item { display: flex; justify-content: space-between; font-size: 0.85rem; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    </style>
 </head>
 <body>
-    <h1>GitHub Pages شغال ✅</h1>
-    <p>موقع نظام المكتبة اشتغل بنجاح</p>
+
+    <!-- تسجيل الدخول -->
+    <div id="login-screen">
+        <div class="login-card">
+            <img src="icon.png" width="70" style="margin-bottom:10px;" onerror="this.style.display='none'">
+            <h1 style="color: var(--primary); margin: 0 0 20px 0;">Library Pro</h1>
+            <div id="login-error-msg" style="color:red; font-size:0.8rem; margin-bottom:10px;"></div>
+            <input type="text" id="user-field" class="form-control" placeholder="اسم المستخدم">
+            <input type="password" id="pass-field" class="form-control" placeholder="كلمة المرور">
+            <button class="btn btn-main" onclick="App.handleLogin()">دخول للنظام</button>
+        </div>
+    </div>
+
+    <!-- واجهة التطبيق -->
+    <header id="app-header" class="header hidden">
+        <div style="font-weight: bold;"><i class="fas fa-book-open"></i> المكتبة الذكية</div>
+        <div style="display: flex; gap: 15px; align-items: center;">
+            <i class="fas fa-moon" onclick="UI.toggleTheme()" style="cursor: pointer;"></i>
+            <span id="user-name-label" style="font-size: 0.7rem; background: var(--primary); color: white; padding: 3px 10px; border-radius: 20px;"></span>
+        </div>
+    </header>
+
+    <main id="main-app" class="main-container hidden">
+        <!-- الرئيسية -->
+        <section id="dash-page">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px;">
+                <div class="card" style="background: var(--primary); color: white; margin-bottom:0;">
+                    <small>مبيعات اليوم</small> <h2 id="total-sales-val">0</h2>
+                </div>
+                <div class="card" style="border-right: 5px solid var(--success); margin-bottom:0;">
+                    <small>صافي الربح</small> <h2 id="total-profit-val" style="color: var(--success);">0</h2>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3><i class="fas fa-history"></i> سجل المبيعات (اليوم)</h3>
+                <div id="sales-log-container"></div>
+            </div>
+        </section>
+
+        <!-- البيع -->
+        <section id="pos-page" class="hidden">
+            <input type="text" id="pos-search-input" class="form-control" placeholder="بحث سريع عن مادة..." onkeyup="POS.render()">
+            <div id="pos-products-list" class="pos-grid"></div>
+        </section>
+
+        <!-- الديون -->
+        <section id="debt-page" class="hidden">
+            <div class="card">
+                <h3>سجل الديون والأجل</h3>
+                <input type="text" id="debt-search-input" class="form-control" placeholder="بحث باسم الزبون..." onkeyup="Debts.render()">
+                <div id="debt-items-list"></div>
+            </div>
+        </section>
+
+        <!-- المخزن -->
+        <section id="inv-page" class="hidden">
+            <button class="btn btn-main" style="margin-bottom: 15px;" onclick="Inv.openAddModal()">+ إضافة منتج جديد</button>
+            <div id="inv-items-list"></div>
+        </section>
+
+        <!-- الإعدادات -->
+        <section id="set-page" class="hidden">
+            <div class="card">
+                <h3>إدارة الموظفين</h3>
+                <div id="staff-items-list"></div>
+                <button class="btn btn-main" style="margin-top: 10px; background:var(--success)" onclick="Users.openAddModal()">إضافة موظف</button>
+            </div>
+            <button class="btn" style="background: var(--danger); color: white;" onclick="App.logout()">خروج</button>
+        </section>
+    </main>
+
+    <!-- سلة الشراء -->
+    <div id="cart-drawer">
+        <div><small>المجموع:</small> <div id="cart-total-val" style="font-size: 1.2rem; font-weight: bold;">0</div></div>
+        <button class="btn" style="background: white; color: var(--primary); width: auto;" onclick="POS.showCheckout()">دفع / أجل</button>
+    </div>
+
+    <!-- التنقل -->
+    <nav id="bottom-nav" class="bottom-nav hidden">
+        <div class="nav-item active" onclick="UI.switchPage('dash', this)" id="btn-nav-dash"><i class="fas fa-chart-line"></i>الرئيسية</div>
+        <div class="nav-item" onclick="UI.switchPage('pos', this)"><i class="fas fa-shopping-cart"></i>البيع</div>
+        <div class="nav-item" onclick="UI.switchPage('debt', this)"><i class="fas fa-user-clock"></i>الديون</div>
+        <div class="nav-item" onclick="UI.switchPage('inv', this)"><i class="fas fa-box"></i>المخزن</div>
+        <div class="nav-item" onclick="UI.switchPage('set', this)" id="btn-nav-set"><i class="fas fa-cog"></i>الإعدادات</div>
+    </nav>
+
+    <!-- المودال -->
+    <div id="modal-container" class="modal-overlay hidden">
+        <div class="modal-body">
+            <h3 id="modal-title-text">العنوان</h3>
+            <div id="modal-content-area"></div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn btn-main" id="modal-confirm-btn" style="flex: 2;">تأكيد</button>
+                <button class="btn" onclick="UI.closeModal()" style="flex: 1; border:1px solid #ccc">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. قاعدة البيانات (Database Schema) ---
+        let DB = {
+            products: JSON.parse(localStorage.getItem('LIB_DB_PRODS')) || [],
+            sales: JSON.parse(localStorage.getItem('LIB_DB_SALES')) || [],
+            users: JSON.parse(localStorage.getItem('LIB_DB_USERS')) || [{id: 1, name: 'المدير', user: 'admin', pass: '123', role: 'admin'}],
+            debts: JSON.parse(localStorage.getItem('LIB_DB_DEBTS')) || [],
+            config: JSON.parse(localStorage.getItem('LIB_DB_CONF')) || { theme: 'light' }
+        };
+
+        const sync = () => {
+            localStorage.setItem('LIB_DB_PRODS', JSON.stringify(DB.products));
+            localStorage.setItem('LIB_DB_SALES', JSON.stringify(DB.sales));
+            localStorage.setItem('LIB_DB_USERS', JSON.stringify(DB.users));
+            localStorage.setItem('LIB_DB_DEBTS', JSON.stringify(DB.debts));
+            localStorage.setItem('LIB_DB_CONF', JSON.stringify(DB.config));
+        };
+
+        // --- 2. محرك التطبيق ---
+        const App = {
+            user: null,
+            handleLogin: () => {
+                const u = document.getElementById('user-field').value.trim();
+                const p = document.getElementById('pass-field').value.trim();
+                const found = DB.users.find(x => x.user === u && x.pass === p);
+
+                if (found) {
+                    App.user = found;
+                    document.getElementById('login-screen').style.display = 'none';
+                    document.getElementById('app-header').classList.remove('hidden');
+                    document.getElementById('main-app').classList.remove('hidden');
+                    document.getElementById('bottom-nav').classList.remove('hidden');
+                    document.getElementById('user-name-label').innerText = found.name;
+
+                    if(found.role !== 'admin') {
+                        document.getElementById('btn-nav-dash').style.display = 'none';
+                        document.getElementById('btn-nav-set').style.display = 'none';
+                        UI.switchPage('pos', document.querySelectorAll('.nav-item')[1]);
+                    }
+                    UI.applyTheme(); UI.updateDash(); POS.render(); Inv.render(); Users.render(); Debts.render();
+                } else {
+                    document.getElementById('login-error-msg').innerText = "خطأ في الدخول!";
+                }
+            },
+            logout: () => location.reload()
+        };
+
+        const UI = {
+            switchPage: (p, btn) => {
+                document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
+                document.getElementById(p + '-page').classList.remove('hidden');
+                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                btn.classList.add('active');
+            },
+            toggleTheme: () => { DB.config.theme = DB.config.theme === 'light' ? 'dark' : 'light'; UI.applyTheme(); sync(); },
+            applyTheme: () => document.documentElement.setAttribute('data-theme', DB.config.theme),
+            openModal: (t, h, c) => {
+                document.getElementById('modal-title-text').innerText = t;
+                document.getElementById('modal-content-area').innerHTML = h;
+                document.getElementById('modal-confirm-btn').onclick = c;
+                document.getElementById('modal-container').classList.remove('hidden');
+            },
+            closeModal: () => document.getElementById('modal-container').classList.add('hidden'),
+            updateDash: () => {
+                const today = new Date().toLocaleDateString();
+                const ts = DB.sales.filter(s => new Date(s.date).toLocaleDateString() === today);
+                document.getElementById('total-sales-val').innerText = ts.reduce((a,b)=>a+b.total,0).toLocaleString() + " د.ع";
+                document.getElementById('total-profit-val').innerText = ts.reduce((a,b)=>a+b.profit,0).toLocaleString() + " د.ع";
+                
+                // سجل المبيعات
+                document.getElementById('sales-log-container').innerHTML = ts.slice(-10).reverse().map(s => `
+                    <div class="log-item">
+                        <span>${s.items}</span>
+                        <span><b>${s.total}</b> <small>(${s.seller})</small></span>
+                    </div>
+                `).join('') || "لا توجد مبيعات بعد";
+            }
+        };
+
+        // --- 3. نظام البيع ---
+        let cart = [];
+        const POS = {
+            render: () => {
+                const q = document.getElementById('pos-search-input').value.toLowerCase();
+                document.getElementById('pos-products-list').innerHTML = DB.products.filter(p => p.name.toLowerCase().includes(q)).map(p => `
+                    <div class="product-item" onclick="POS.add(${p.id})">
+                        <b>${p.name}</b><br>
+                        <span style="color:var(--primary)">${p.sellPrice}</span><br>
+                        <span class="stock-badge">${p.stock} قطعة</span>
+                    </div>`).join('');
+            },
+            add: (id) => {
+                const p = DB.products.find(x => x.id === id);
+                if(p.stock <= 0) return alert("نفذ المخزون!");
+                cart.push(p);
+                document.getElementById('cart-total-val').innerText = cart.reduce((a,b)=>a+b.sellPrice,0).toLocaleString();
+                document.getElementById('cart-drawer').classList.add('active');
+            },
+            showCheckout: () => {
+                const total = cart.reduce((a,b)=>a+b.sellPrice,0);
+                const html = `<h4>المجموع: ${total} د.ع</h4>
+                              <input type="text" id="cust-name-debt" class="form-control" placeholder="اسم الزبون (للدين فقط)">
+                              <select id="pay-select" class="form-control"><option value="cash">نقدي (كاش)</option><option value="debt">أجل (دين)</option></select>`;
+                UI.openModal("إتمام العملية", html, POS.complete);
+            },
+            complete: () => {
+                const method = document.getElementById('pay-select').value;
+                const cust = document.getElementById('cust-name-debt').value;
+                const totalSell = cart.reduce((a,b)=>a+b.sellPrice,0);
+                const totalCost = cart.reduce((a,b)=>a+b.costPrice,0);
+                const itemNames = cart.map(i => i.name).join('، ');
+
+                if(method === 'debt' && !cust) return alert("اكتب اسم الزبون!");
+
+                cart.forEach(i => { DB.products.find(p=>p.id===i.id).stock--; });
+                
+                if(method === 'debt') {
+                    DB.debts.push({ id: Date.now(), customer: cust, amount: totalSell, date: new Date().toISOString() });
+                } else {
+                    DB.sales.push({ id: Date.now(), items: itemNames, total: totalSell, profit: totalSell - totalCost, date: new Date().toISOString(), seller: App.user.name });
+                }
+
+                cart = []; sync(); POS.render(); UI.updateDash(); Debts.render(); UI.closeModal();
+                document.getElementById('cart-drawer').classList.remove('active');
+            }
+        };
+
+        // --- 4. نظام الديون الجزئي ---
+        const Debts = {
+            render: () => {
+                const q = document.getElementById('debt-search-input').value.toLowerCase();
+                document.getElementById('debt-items-list').innerHTML = DB.debts.filter(d => d.customer.toLowerCase().includes(q)).map(d => `
+                    <div class="card" style="display:flex; justify-content:space-between; align-items:center; border-right: 5px solid var(--danger);">
+                        <div><b>${d.customer}</b><br><small>${new Date(d.date).toLocaleDateString()}</small></div>
+                        <div style="text-align:left"><b style="color:var(--danger)">${d.amount}</b><br>
+                        <button onclick="Debts.payModal(${d.id})" style="border:none; color:var(--success); background:none; font-weight:bold; cursor:pointer">تسديد 💸</button></div>
+                    </div>`).join('') || "لا يوجد ديون.";
+            },
+            payModal: (id) => {
+                const d = DB.debts.find(x => x.id === id);
+                const html = `<p>الدين الكلي: <b>${d.amount}</b></p>
+                              <input type="number" id="pay-amount-input" class="form-control" placeholder="المبلغ المراد تسديده الآن">`;
+                UI.openModal("تسديد دين", html, () => Debts.processPay(id));
+            },
+            processPay: (id) => {
+                const paid = parseInt(document.getElementById('pay-amount-input').value);
+                if(!paid || paid <= 0) return alert("أدخل مبلغاً صالحاً");
+                
+                const d = DB.debts.find(x => x.id === id);
+                d.amount -= paid;
+
+                // إذا تسدد بالكامل أو أكثر يحذف من الديون
+                if(d.amount <= 0) {
+                    DB.debts = DB.debts.filter(x => x.id !== id);
+                    alert("تم تسديد الدين بالكامل");
+                } else {
+                    alert(`تم خصم المبلغ. المتبقي: ${d.amount}`);
+                }
+
+                sync(); Debts.render(); UI.updateDash(); UI.closeModal();
+            }
+        };
+
+        // --- 5. المخزن والموظفين ---
+        const Inv = {
+            render: () => {
+                document.getElementById('inv-items-list').innerHTML = DB.products.map(p => `
+                    <div class="card" style="display:flex; justify-content:space-between; align-items:center">
+                        <div><b>${p.name}</b> (${p.stock} قطعة)<br><small>شراء: ${p.costPrice} | بيع: ${p.sellPrice}</small></div>
+                        <button class="btn" style="width:auto; color:var(--danger)" onclick="Inv.del(${p.id})"><i class="fas fa-trash"></i></button>
+                    </div>`).join('');
+            },
+            openAddModal: () => {
+                const h = `<input id="p-name-in" class="form-control" placeholder="اسم المادة">
+                           <input type="number" id="p-cost-in" class="form-control" placeholder="سعر الشراء">
+                           <input type="number" id="p-sell-in" class="form-control" placeholder="سعر البيع">
+                           <input type="number" id="p-stock-in" class="form-control" placeholder="الكمية">`;
+                UI.openModal("مادة جديدة", h, Inv.save);
+            },
+            save: () => {
+                const n = document.getElementById('p-name-in').value, cp = parseInt(document.getElementById('p-cost-in').value), sp = parseInt(document.getElementById('p-sell-in').value), s = parseInt(document.getElementById('p-stock-in').value);
+                if(n && sp) { DB.products.push({id: Date.now(), name: n, costPrice: cp, sellPrice: sp, stock: s}); sync(); Inv.render(); POS.render(); UI.closeModal(); }
+            },
+            del: (id) => { if(confirm("حذف المادة؟")) { DB.products = DB.products.filter(x=>x.id!==id); sync(); Inv.render(); POS.render(); } }
+        };
+
+        const Users = {
+            render: () => { document.getElementById('staff-items-list').innerHTML = DB.users.map(u => `<div>${u.name} (${u.role})</div>`).join(''); },
+            openAddModal: () => {
+                const h = `<input id="u-name-in" class="form-control" placeholder="الاسم الكامل"><input id="u-user-in" class="form-control" placeholder="اسم الدخول"><input id="u-pass-in" class="form-control" placeholder="كلمة المرور">`;
+                UI.openModal("موظف جديد", h, Users.save);
+            },
+            save: () => {
+                const n = document.getElementById('u-name-in').value, u = document.getElementById('u-user-in').value, p = document.getElementById('u-pass-in').value;
+                if(n && u && p) { DB.users.push({id: Date.now(), name: n, user: u, pass: p, role: 'staff'}); sync(); Users.render(); UI.closeModal(); }
+            }
+        };
+    </script>
 </body>
 </html>
