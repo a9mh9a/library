@@ -3,11 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Library Pro Elite v2</title>
+    <title>مطبعة الثناء (مع الفواتير)</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4361ee">
     <link rel="icon" type="image/png" href="icon.png">
+    
+    <!-- المكتبات الخارجية: أيقونات + تحويل HTML لصورة -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
     <style>
         :root {
             --primary: #4361ee; --bg-color: #f0f2f5; --card-bg: #ffffff;
@@ -58,6 +62,39 @@
         
         /* Sales Log Table */
         .log-item { display: flex; justify-content: space-between; font-size: 0.85rem; padding: 8px 0; border-bottom: 1px solid var(--border); }
+
+        /* ==================== أنماط الفاتورة الجديدة ==================== */
+        #invoice-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999; display: none; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
+        .invoice-box { background: #fff; width: 100%; max-width: 380px; border-radius: 8px; overflow: hidden; animation: popUp 0.3s ease; }
+        
+        /* شكل ورقة الكاشير */
+        #receipt-paper { padding: 20px; background: white; color: #000; font-family: 'Courier New', Courier, monospace; font-size: 13px; line-height: 1.4; border-bottom: 2px dashed #ccc; }
+        .rec-header { text-align: center; margin-bottom: 15px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+        .rec-meta { font-size: 11px; margin-bottom: 10px; }
+        .rec-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 12px; }
+        .rec-table th { border-bottom: 1px solid #000; text-align: right; }
+        .rec-table td { padding: 4px 0; text-align: right; }
+        .rec-total { border-top: 2px solid #000; padding-top: 5px; text-align: center; font-weight: bold; font-size: 16px; margin-top: 10px; }
+        
+        /* أزرار الفاتورة */
+        .inv-actions { padding: 15px; background: #f1f2f6; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .btn-action { border: none; padding: 10px; border-radius: 5px; cursor: pointer; color: white; font-weight: bold; font-family: sans-serif; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; gap: 5px; }
+        .btn-print { background: #2d3436; grid-column: span 2; }
+        .btn-dl { background: #0984e3; }
+        .btn-wa { background: #00b894; }
+        .btn-close { background: #ff7675; grid-column: span 2; margin-top: 5px; }
+
+        @keyframes popUp { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        /* إعدادات الطباعة: إخفاء كل شيء ما عدا الفاتورة */
+        @media print {
+            body > * { display: none !important; }
+            #invoice-overlay, #invoice-overlay * { display: block !important; visibility: visible !important; }
+            #invoice-overlay { position: absolute; left: 0; top: 0; background: white; padding: 0; }
+            .invoice-box { box-shadow: none; max-width: 100%; width: 100%; }
+            .inv-actions { display: none; }
+            #receipt-paper { border: none; }
+        }
     </style>
 </head>
 <body>
@@ -66,7 +103,7 @@
     <div id="login-screen">
         <div class="login-card">
             <img src="icon.png" width="70" style="margin-bottom:10px;" onerror="this.style.display='none'">
-            <h1 style="color: var(--primary); margin: 0 0 20px 0;">Library Pro</h1>
+            <h1 style="color: var(--primary); margin: 0 0 20px 0;">مطبعة الثناء</h1>
             <div id="login-error-msg" style="color:red; font-size:0.8rem; margin-bottom:10px;"></div>
             <input type="text" id="user-field" class="form-control" placeholder="اسم المستخدم">
             <input type="password" id="pass-field" class="form-control" placeholder="كلمة المرور">
@@ -76,7 +113,7 @@
 
     <!-- واجهة التطبيق -->
     <header id="app-header" class="header hidden">
-        <div style="font-weight: bold;"><i class="fas fa-book-open"></i> المكتبة الذكية</div>
+        <div style="font-weight: bold;"><i class="fas fa-book-open"></i> مطبعة الثناء</div>
         <div style="display: flex; gap: 15px; align-items: center;">
             <i class="fas fa-moon" onclick="UI.toggleTheme()" style="cursor: pointer;"></i>
             <span id="user-name-label" style="font-size: 0.7rem; background: var(--primary); color: white; padding: 3px 10px; border-radius: 20px;"></span>
@@ -148,7 +185,7 @@
         <div class="nav-item" onclick="UI.switchPage('set', this)" id="btn-nav-set"><i class="fas fa-cog"></i>الإعدادات</div>
     </nav>
 
-    <!-- المودال -->
+    <!-- المودال (النافذة المنبثقة العامة) -->
     <div id="modal-container" class="modal-overlay hidden">
         <div class="modal-body">
             <h3 id="modal-title-text">العنوان</h3>
@@ -156,6 +193,19 @@
             <div style="display: flex; gap: 10px; margin-top: 20px;">
                 <button class="btn btn-main" id="modal-confirm-btn" style="flex: 2;">تأكيد</button>
                 <button class="btn" onclick="UI.closeModal()" style="flex: 1; border:1px solid #ccc">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة الفاتورة الجديدة -->
+    <div id="invoice-overlay">
+        <div class="invoice-box">
+            <div id="receipt-paper"></div> <!-- محتوى الفاتورة سيتم حقنه هنا -->
+            <div class="inv-actions">
+                <button class="btn-action btn-print" onclick="InvoiceSys.print()"><i class="fas fa-print"></i> طباعة الوصل</button>
+                <button class="btn-action btn-dl" onclick="InvoiceSys.download()"><i class="fas fa-download"></i> تحميل صورة</button>
+                <button class="btn-action btn-wa" onclick="InvoiceSys.share()"><i class="fab fa-whatsapp"></i> واتساب</button>
+                <button class="btn-action btn-close" onclick="InvoiceSys.close()">إغلاق</button>
             </div>
         </div>
     </div>
@@ -239,7 +289,7 @@
             }
         };
 
-        // --- 3. نظام البيع ---
+        // --- 3. نظام البيع (تم تحديثه ليدعم الفاتورة) ---
         let cart = [];
         const POS = {
             render: () => {
@@ -261,7 +311,7 @@
             showCheckout: () => {
                 const total = cart.reduce((a,b)=>a+b.sellPrice,0);
                 const html = `<h4>المجموع: ${total} د.ع</h4>
-                              <input type="text" id="cust-name-debt" class="form-control" placeholder="اسم الزبون (للدين فقط)">
+                              <input type="text" id="cust-name-debt" class="form-control" placeholder="اسم الزبون (للدين أو للفاتورة)">
                               <select id="pay-select" class="form-control"><option value="cash">نقدي (كاش)</option><option value="debt">أجل (دين)</option></select>`;
                 UI.openModal("إتمام العملية", html, POS.complete);
             },
@@ -274,20 +324,109 @@
 
                 if(method === 'debt' && !cust) return alert("اكتب اسم الزبون!");
 
+                // خصم المخزون
                 cart.forEach(i => { DB.products.find(p=>p.id===i.id).stock--; });
                 
+                // حفظ العملية
                 if(method === 'debt') {
                     DB.debts.push({ id: Date.now(), customer: cust, amount: totalSell, date: new Date().toISOString() });
                 } else {
                     DB.sales.push({ id: Date.now(), items: itemNames, total: totalSell, profit: totalSell - totalCost, date: new Date().toISOString(), seller: App.user.name });
                 }
 
-                cart = []; sync(); POS.render(); UI.updateDash(); Debts.render(); UI.closeModal();
+                // >>> جديد: توليد الفاتورة قبل مسح السلة <<<
+                const invoiceCart = [...cart]; // نسخة من السلة
+                InvoiceSys.generate(invoiceCart, totalSell, cust, method);
+
+                // تنظيف وتحديث
+                cart = []; sync(); POS.render(); UI.updateDash(); Debts.render(); 
+                
+                // نغلق مودال الدفع، لكن مودال الفاتورة سيظهر فوقه
+                UI.closeModal();
                 document.getElementById('cart-drawer').classList.remove('active');
             }
         };
 
-        // --- 4. نظام الديون الجزئي ---
+        // --- 4. نظام الفواتير (جديد) ---
+        const InvoiceSys = {
+            currentData: null,
+            
+            generate: (items, total, cust, type) => {
+                const id = Date.now().toString().slice(-6);
+                const date = new Date().toLocaleString('ar-IQ');
+                const typeLabel = type === 'debt' ? 'أجل (دين)' : 'نقدي';
+                const custLabel = cust || 'زبون عام';
+
+                // تجهيز صفوف الجدول
+                let rows = items.map(i => `
+                    <tr>
+                        <td>${i.name}</td>
+                        <td style="text-align:center">1</td>
+                        <td>${i.sellPrice.toLocaleString()}</td>
+                    </tr>
+                `).join('');
+
+                // تصميم HTML للفاتورة
+                const html = `
+                    <div class="rec-header">
+                        <h2 style="margin:0">مطبعة الثناء</h2>
+                        <div>فاتورة مبيعات</div>
+                    </div>
+                    <div class="rec-meta">
+                        <div><b>رقم الوصل:</b> #${id}</div>
+                        <div><b>التاريخ:</b> ${date}</div>
+                        <div><b>العميل:</b> ${custLabel}</div>
+                        <div><b>نوع الدفع:</b> ${typeLabel}</div>
+                    </div>
+                    <hr style="border-top:1px dashed #000">
+                    <table class="rec-table">
+                        <thead><tr><th>المادة</th><th style="text-align:center">العدد</th><th>السعر</th></tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                    <div class="rec-total">الإجمالي: ${total.toLocaleString()} د.ع</div>
+                    <div style="text-align:center; margin-top:20px; font-size:10px">شكراً لتسوقكم معنا</div>
+                `;
+
+                document.getElementById('receipt-paper').innerHTML = html;
+                
+                // حفظ البيانات للمشاركة والتحميل
+                InvoiceSys.currentData = { id, total, cust: custLabel, date };
+                
+                // إظهار النافذة
+                document.getElementById('invoice-overlay').style.display = 'flex';
+            },
+
+            print: () => {
+                window.print();
+            },
+
+            download: () => {
+                const element = document.getElementById('receipt-paper');
+                html2canvas(element).then(canvas => {
+                    const link = document.createElement('a');
+                    link.download = `Invoice-${InvoiceSys.currentData.id}.png`;
+                    link.href = canvas.toDataURL();
+                    link.click();
+                });
+            },
+
+            share: () => {
+                if(!InvoiceSys.currentData) return;
+                const d = InvoiceSys.currentData;
+                const text = `*فاتورة مبيعات - مطبعة الثناء*%0a` +
+                             `رقم: ${d.id}%0a` +
+                             `العميل: ${d.cust}%0a` +
+                             `التاريخ: ${d.date}%0a` +
+                             `*الإجمالي: ${d.total.toLocaleString()} د.ع*`;
+                window.open(`https://wa.me/?text=${text}`, '_blank');
+            },
+
+            close: () => {
+                document.getElementById('invoice-overlay').style.display = 'none';
+            }
+        };
+
+        // --- 5. نظام الديون الجزئي ---
         const Debts = {
             render: () => {
                 const q = document.getElementById('debt-search-input').value.toLowerCase();
@@ -311,7 +450,6 @@
                 const d = DB.debts.find(x => x.id === id);
                 d.amount -= paid;
 
-                // إذا تسدد بالكامل أو أكثر يحذف من الديون
                 if(d.amount <= 0) {
                     DB.debts = DB.debts.filter(x => x.id !== id);
                     alert("تم تسديد الدين بالكامل");
@@ -323,7 +461,7 @@
             }
         };
 
-        // --- 5. المخزن والموظفين ---
+        // --- 6. المخزن والموظفين (تم تحديثه لإضافة حذف الموظف) ---
         const Inv = {
             render: () => {
                 document.getElementById('inv-items-list').innerHTML = DB.products.map(p => `
@@ -347,7 +485,16 @@
         };
 
         const Users = {
-            render: () => { document.getElementById('staff-items-list').innerHTML = DB.users.map(u => `<div>${u.name} (${u.role})</div>`).join(''); },
+            render: () => { 
+                document.getElementById('staff-items-list').innerHTML = DB.users.map(u => `
+                    <div class="card" style="display:flex; justify-content:space-between; align-items:center; padding:10px; margin-bottom:5px">
+                        <div>${u.name} <small>(${u.role})</small></div>
+                        ${u.role !== 'admin' ? 
+                          `<button class="btn" style="width:auto; background:var(--danger); color:white; padding:5px 10px; font-size:0.7rem" onclick="Users.delete(${u.id})">حذف</button>` 
+                          : '<i class="fas fa-shield-alt" style="color:var(--primary)"></i>'}
+                    </div>
+                `).join(''); 
+            },
             openAddModal: () => {
                 const h = `<input id="u-name-in" class="form-control" placeholder="الاسم الكامل"><input id="u-user-in" class="form-control" placeholder="اسم الدخول"><input id="u-pass-in" class="form-control" placeholder="كلمة المرور">`;
                 UI.openModal("موظف جديد", h, Users.save);
@@ -355,6 +502,14 @@
             save: () => {
                 const n = document.getElementById('u-name-in').value, u = document.getElementById('u-user-in').value, p = document.getElementById('u-pass-in').value;
                 if(n && u && p) { DB.users.push({id: Date.now(), name: n, user: u, pass: p, role: 'staff'}); sync(); Users.render(); UI.closeModal(); }
+            },
+            // دالة حذف الموظف الجديدة
+            delete: (id) => {
+                if(confirm("هل أنت متأكد من حذف هذا الموظف؟")) {
+                    DB.users = DB.users.filter(u => u.id !== id);
+                    sync();
+                    Users.render();
+                }
             }
         };
     </script>
