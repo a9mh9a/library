@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>مطبعة الثناء (مع الفواتير)</title>
+    <title>مطبعة الثناء (سحابي)</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4361ee">
     <link rel="icon" type="image/png" href="icon.png">
@@ -63,11 +63,10 @@
         /* Sales Log Table */
         .log-item { display: flex; justify-content: space-between; font-size: 0.85rem; padding: 8px 0; border-bottom: 1px solid var(--border); }
 
-        /* ==================== أنماط الفاتورة الجديدة ==================== */
+        /* ==================== أنماط الفاتورة ==================== */
         #invoice-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999; display: none; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
         .invoice-box { background: #fff; width: 100%; max-width: 380px; border-radius: 8px; overflow: hidden; animation: popUp 0.3s ease; }
         
-        /* شكل ورقة الكاشير */
         #receipt-paper { padding: 20px; background: white; color: #000; font-family: 'Courier New', Courier, monospace; font-size: 13px; line-height: 1.4; border-bottom: 2px dashed #ccc; }
         .rec-header { text-align: center; margin-bottom: 15px; border-bottom: 2px solid #000; padding-bottom: 10px; }
         .rec-meta { font-size: 11px; margin-bottom: 10px; }
@@ -76,7 +75,6 @@
         .rec-table td { padding: 4px 0; text-align: right; }
         .rec-total { border-top: 2px solid #000; padding-top: 5px; text-align: center; font-weight: bold; font-size: 16px; margin-top: 10px; }
         
-        /* أزرار الفاتورة */
         .inv-actions { padding: 15px; background: #f1f2f6; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .btn-action { border: none; padding: 10px; border-radius: 5px; cursor: pointer; color: white; font-weight: bold; font-family: sans-serif; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; gap: 5px; }
         .btn-print { background: #2d3436; grid-column: span 2; }
@@ -86,7 +84,6 @@
 
         @keyframes popUp { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
-        /* إعدادات الطباعة: إخفاء كل شيء ما عدا الفاتورة */
         @media print {
             body > * { display: none !important; }
             #invoice-overlay, #invoice-overlay * { display: block !important; visibility: visible !important; }
@@ -98,13 +95,13 @@
     </style>
 </head>
 <body>
-
+<!-- <button onclick="saveTest()">حفظ تجربة</button> -->
     <!-- تسجيل الدخول -->
     <div id="login-screen">
         <div class="login-card">
             <img src="icon.png" width="70" style="margin-bottom:10px;" onerror="this.style.display='none'">
             <h1 style="color: var(--primary); margin: 0 0 20px 0;">مطبعة الثناء</h1>
-            <div id="login-error-msg" style="color:red; font-size:0.8rem; margin-bottom:10px;"></div>
+            <div id="login-error-msg" style="color:red; font-size:0.8rem; margin-bottom:10px;">جارِ تحميل البيانات...</div>
             <input type="text" id="user-field" class="form-control" placeholder="اسم المستخدم">
             <input type="password" id="pass-field" class="form-control" placeholder="كلمة المرور">
             <button class="btn btn-main" onclick="App.handleLogin()">دخول للنظام</button>
@@ -185,7 +182,7 @@
         <div class="nav-item" onclick="UI.switchPage('set', this)" id="btn-nav-set"><i class="fas fa-cog"></i>الإعدادات</div>
     </nav>
 
-    <!-- المودال (النافذة المنبثقة العامة) -->
+    <!-- المودال -->
     <div id="modal-container" class="modal-overlay hidden">
         <div class="modal-body">
             <h3 id="modal-title-text">العنوان</h3>
@@ -197,10 +194,10 @@
         </div>
     </div>
 
-    <!-- نافذة الفاتورة الجديدة -->
+    <!-- نافذة الفاتورة -->
     <div id="invoice-overlay">
         <div class="invoice-box">
-            <div id="receipt-paper"></div> <!-- محتوى الفاتورة سيتم حقنه هنا -->
+            <div id="receipt-paper"></div>
             <div class="inv-actions">
                 <button class="btn-action btn-print" onclick="InvoiceSys.print()"><i class="fas fa-print"></i> طباعة الوصل</button>
                 <button class="btn-action btn-dl" onclick="InvoiceSys.download()"><i class="fas fa-download"></i> تحميل صورة</button>
@@ -210,26 +207,76 @@
         </div>
     </div>
 
-    <script>
-        // --- 1. قاعدة البيانات (Database Schema) ---
+    <!-- كود الجافاسكربت وربط قاعدة البيانات -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+        import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+
+        // إعدادات فايربيس
+        const firebaseConfig = {
+            apiKey: "AIzaSyBjfP7o6GL6hb4kUS7-3H35u3qjaRKHJ0Y",
+            authDomain: "database-4187a.firebaseapp.com",
+            projectId: "database-4187a",
+            storageBucket: "database-4187a.firebasestorage.app",
+            messagingSenderId: "142567656823",
+            appId: "1:142567656823:web:7348f2f971222731b0a572"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // البيانات المحلية (للعرض السريع)
         let DB = {
-            products: JSON.parse(localStorage.getItem('LIB_DB_PRODS')) || [],
-            sales: JSON.parse(localStorage.getItem('LIB_DB_SALES')) || [],
-            users: JSON.parse(localStorage.getItem('LIB_DB_USERS')) || [{id: 1, name: 'المدير', user: 'admin', pass: '123', role: 'admin'}],
-            debts: JSON.parse(localStorage.getItem('LIB_DB_DEBTS')) || [],
+            products: [],
+            sales: [],
+            users: [],
+            debts: [],
             config: JSON.parse(localStorage.getItem('LIB_DB_CONF')) || { theme: 'light' }
         };
 
-        const sync = () => {
-            localStorage.setItem('LIB_DB_PRODS', JSON.stringify(DB.products));
-            localStorage.setItem('LIB_DB_SALES', JSON.stringify(DB.sales));
-            localStorage.setItem('LIB_DB_USERS', JSON.stringify(DB.users));
-            localStorage.setItem('LIB_DB_DEBTS', JSON.stringify(DB.debts));
-            localStorage.setItem('LIB_DB_CONF', JSON.stringify(DB.config));
-        };
+        let cart = [];
 
-        // --- 2. محرك التطبيق ---
-        const App = {
+        // دالة التحميل الرئيسية
+        async function loadDataFromFirebase() {
+            try {
+                // جلب المنتجات
+                const prodSnap = await getDocs(collection(db, "products"));
+                DB.products = prodSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+                // جلب المبيعات
+                const saleSnap = await getDocs(collection(db, "sales"));
+                DB.sales = saleSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+                // جلب الديون
+                const debtSnap = await getDocs(collection(db, "debts"));
+                DB.debts = debtSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+                // جلب المستخدمين
+                const userSnap = await getDocs(collection(db, "users"));
+                DB.users = userSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                
+                // إنشاء مدير افتراضي إذا كانت القاعدة فارغة
+                if (DB.users.length === 0) {
+                    const admin = { name: 'المدير', user: 'admin', pass: '123', role: 'admin' };
+                    const docRef = await addDoc(collection(db, "users"), admin);
+                    DB.users.push({ id: docRef.id, ...admin });
+                }
+
+                document.getElementById('login-error-msg').innerText = ""; 
+                
+                if(window.App.user) {
+                    UI.updateDash(); POS.render(); Inv.render(); Debts.render(); Users.render();
+                }
+
+            } catch (error) {
+                console.error("خطأ:", error);
+                document.getElementById('login-error-msg').innerText = "فشل الاتصال بالقاعدة!";
+            }
+        }
+
+        // --- ربط الدوال بالكائن Window ---
+
+        window.App = {
             user: null,
             handleLogin: () => {
                 const u = document.getElementById('user-field').value.trim();
@@ -237,7 +284,7 @@
                 const found = DB.users.find(x => x.user === u && x.pass === p);
 
                 if (found) {
-                    App.user = found;
+                    window.App.user = found;
                     document.getElementById('login-screen').style.display = 'none';
                     document.getElementById('app-header').classList.remove('hidden');
                     document.getElementById('main-app').classList.remove('hidden');
@@ -249,22 +296,27 @@
                         document.getElementById('btn-nav-set').style.display = 'none';
                         UI.switchPage('pos', document.querySelectorAll('.nav-item')[1]);
                     }
-                    UI.applyTheme(); UI.updateDash(); POS.render(); Inv.render(); Users.render(); Debts.render();
+                    UI.applyTheme(); 
+                    UI.updateDash(); POS.render(); Inv.render(); Users.render(); Debts.render();
                 } else {
-                    document.getElementById('login-error-msg').innerText = "خطأ في الدخول!";
+                    document.getElementById('login-error-msg').innerText = "بيانات خاطئة أو جاري التحميل...";
                 }
             },
             logout: () => location.reload()
         };
 
-        const UI = {
+        window.UI = {
             switchPage: (p, btn) => {
                 document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
                 document.getElementById(p + '-page').classList.remove('hidden');
                 document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
                 btn.classList.add('active');
             },
-            toggleTheme: () => { DB.config.theme = DB.config.theme === 'light' ? 'dark' : 'light'; UI.applyTheme(); sync(); },
+            toggleTheme: () => { 
+                DB.config.theme = DB.config.theme === 'light' ? 'dark' : 'light'; 
+                localStorage.setItem('LIB_DB_CONF', JSON.stringify(DB.config)); 
+                UI.applyTheme(); 
+            },
             applyTheme: () => document.documentElement.setAttribute('data-theme', DB.config.theme),
             openModal: (t, h, c) => {
                 document.getElementById('modal-title-text').innerText = t;
@@ -279,7 +331,6 @@
                 document.getElementById('total-sales-val').innerText = ts.reduce((a,b)=>a+b.total,0).toLocaleString() + " د.ع";
                 document.getElementById('total-profit-val').innerText = ts.reduce((a,b)=>a+b.profit,0).toLocaleString() + " د.ع";
                 
-                // سجل المبيعات
                 document.getElementById('sales-log-container').innerHTML = ts.slice(-10).reverse().map(s => `
                     <div class="log-item">
                         <span>${s.items}</span>
@@ -289,13 +340,11 @@
             }
         };
 
-        // --- 3. نظام البيع (تم تحديثه ليدعم الفاتورة) ---
-        let cart = [];
-        const POS = {
+        window.POS = {
             render: () => {
                 const q = document.getElementById('pos-search-input').value.toLowerCase();
                 document.getElementById('pos-products-list').innerHTML = DB.products.filter(p => p.name.toLowerCase().includes(q)).map(p => `
-                    <div class="product-item" onclick="POS.add(${p.id})">
+                    <div class="product-item" onclick="POS.add('${p.id}')">
                         <b>${p.name}</b><br>
                         <span style="color:var(--primary)">${p.sellPrice}</span><br>
                         <span class="stock-badge">${p.stock} قطعة</span>
@@ -315,7 +364,7 @@
                               <select id="pay-select" class="form-control"><option value="cash">نقدي (كاش)</option><option value="debt">أجل (دين)</option></select>`;
                 UI.openModal("إتمام العملية", html, POS.complete);
             },
-            complete: () => {
+            complete: async () => {
                 const method = document.getElementById('pay-select').value;
                 const cust = document.getElementById('cust-name-debt').value;
                 const totalSell = cart.reduce((a,b)=>a+b.sellPrice,0);
@@ -324,117 +373,85 @@
 
                 if(method === 'debt' && !cust) return alert("اكتب اسم الزبون!");
 
-                // خصم المخزون
-                cart.forEach(i => { DB.products.find(p=>p.id===i.id).stock--; });
+                // تحديث المخزون
+                for (let item of cart) {
+                    const productInDB = DB.products.find(p => p.id === item.id);
+                    if (productInDB) {
+                        productInDB.stock--; 
+                        await updateDoc(doc(db, "products", item.id), { stock: productInDB.stock });
+                    }
+                }
                 
-                // حفظ العملية
+                const dateISO = new Date().toISOString();
+                
                 if(method === 'debt') {
-                    DB.debts.push({ id: Date.now(), customer: cust, amount: totalSell, date: new Date().toISOString() });
+                    const newDebt = { customer: cust, amount: totalSell, date: dateISO };
+                    const docRef = await addDoc(collection(db, "debts"), newDebt);
+                    DB.debts.push({ id: docRef.id, ...newDebt });
                 } else {
-                    DB.sales.push({ id: Date.now(), items: itemNames, total: totalSell, profit: totalSell - totalCost, date: new Date().toISOString(), seller: App.user.name });
+                    const newSale = { items: itemNames, total: totalSell, profit: totalSell - totalCost, date: dateISO, seller: App.user.name };
+                    const docRef = await addDoc(collection(db, "sales"), newSale);
+                    DB.sales.push({ id: docRef.id, ...newSale });
                 }
 
-                // >>> جديد: توليد الفاتورة قبل مسح السلة <<<
-                const invoiceCart = [...cart]; // نسخة من السلة
-                InvoiceSys.generate(invoiceCart, totalSell, cust, method);
+                // الفاتورة
+                const invoiceCart = [...cart];
+                window.InvoiceSys.generate(invoiceCart, totalSell, cust, method);
 
-                // تنظيف وتحديث
-                cart = []; sync(); POS.render(); UI.updateDash(); Debts.render(); 
-                
-                // نغلق مودال الدفع، لكن مودال الفاتورة سيظهر فوقه
+                cart = []; 
+                POS.render(); UI.updateDash(); Debts.render();
                 UI.closeModal();
                 document.getElementById('cart-drawer').classList.remove('active');
             }
         };
 
-        // --- 4. نظام الفواتير (جديد) ---
-        const InvoiceSys = {
+        window.InvoiceSys = {
             currentData: null,
-            
             generate: (items, total, cust, type) => {
                 const id = Date.now().toString().slice(-6);
                 const date = new Date().toLocaleString('ar-IQ');
                 const typeLabel = type === 'debt' ? 'أجل (دين)' : 'نقدي';
                 const custLabel = cust || 'زبون عام';
-
-                // تجهيز صفوف الجدول
-                let rows = items.map(i => `
-                    <tr>
-                        <td>${i.name}</td>
-                        <td style="text-align:center">1</td>
-                        <td>${i.sellPrice.toLocaleString()}</td>
-                    </tr>
-                `).join('');
-
-                // تصميم HTML للفاتورة
+                let rows = items.map(i => `<tr><td>${i.name}</td><td style="text-align:center">1</td><td>${i.sellPrice.toLocaleString()}</td></tr>`).join('');
                 const html = `
-                    <div class="rec-header">
-                        <h2 style="margin:0">مطبعة الثناء</h2>
-                        <div>فاتورة مبيعات</div>
-                    </div>
-                    <div class="rec-meta">
-                        <div><b>رقم الوصل:</b> #${id}</div>
-                        <div><b>التاريخ:</b> ${date}</div>
-                        <div><b>العميل:</b> ${custLabel}</div>
-                        <div><b>نوع الدفع:</b> ${typeLabel}</div>
-                    </div>
+                    <div class="rec-header"><h2 style="margin:0">مطبعة الثناء</h2><div>فاتورة مبيعات</div></div>
+                    <div class="rec-meta"><div><b>رقم الوصل:</b> #${id}</div><div><b>التاريخ:</b> ${date}</div><div><b>العميل:</b> ${custLabel}</div><div><b>نوع الدفع:</b> ${typeLabel}</div></div>
                     <hr style="border-top:1px dashed #000">
-                    <table class="rec-table">
-                        <thead><tr><th>المادة</th><th style="text-align:center">العدد</th><th>السعر</th></tr></thead>
-                        <tbody>${rows}</tbody>
-                    </table>
+                    <table class="rec-table"><thead><tr><th>المادة</th><th style="text-align:center">العدد</th><th>السعر</th></tr></thead><tbody>${rows}</tbody></table>
                     <div class="rec-total">الإجمالي: ${total.toLocaleString()} د.ع</div>
                     <div style="text-align:center; margin-top:20px; font-size:10px">شكراً لتسوقكم معنا</div>
                 `;
-
                 document.getElementById('receipt-paper').innerHTML = html;
-                
-                // حفظ البيانات للمشاركة والتحميل
-                InvoiceSys.currentData = { id, total, cust: custLabel, date };
-                
-                // إظهار النافذة
+                window.InvoiceSys.currentData = { id, total, cust: custLabel, date };
                 document.getElementById('invoice-overlay').style.display = 'flex';
             },
-
-            print: () => {
-                window.print();
-            },
-
+            print: () => window.print(),
             download: () => {
                 const element = document.getElementById('receipt-paper');
                 html2canvas(element).then(canvas => {
                     const link = document.createElement('a');
-                    link.download = `Invoice-${InvoiceSys.currentData.id}.png`;
+                    link.download = `Invoice-${window.InvoiceSys.currentData.id}.png`;
                     link.href = canvas.toDataURL();
                     link.click();
                 });
             },
-
             share: () => {
-                if(!InvoiceSys.currentData) return;
-                const d = InvoiceSys.currentData;
-                const text = `*فاتورة مبيعات - مطبعة الثناء*%0a` +
-                             `رقم: ${d.id}%0a` +
-                             `العميل: ${d.cust}%0a` +
-                             `التاريخ: ${d.date}%0a` +
-                             `*الإجمالي: ${d.total.toLocaleString()} د.ع*`;
+                if(!window.InvoiceSys.currentData) return;
+                const d = window.InvoiceSys.currentData;
+                const text = `*فاتورة مبيعات - مطبعة الثناء*%0aرقم: ${d.id}%0aالعميل: ${d.cust}%0aالتاريخ: ${d.date}%0a*الإجمالي: ${d.total.toLocaleString()} د.ع*`;
                 window.open(`https://wa.me/?text=${text}`, '_blank');
             },
-
-            close: () => {
-                document.getElementById('invoice-overlay').style.display = 'none';
-            }
+            close: () => document.getElementById('invoice-overlay').style.display = 'none'
         };
 
-        // --- 5. نظام الديون الجزئي ---
-        const Debts = {
+        window.Debts = {
             render: () => {
                 const q = document.getElementById('debt-search-input').value.toLowerCase();
                 document.getElementById('debt-items-list').innerHTML = DB.debts.filter(d => d.customer.toLowerCase().includes(q)).map(d => `
                     <div class="card" style="display:flex; justify-content:space-between; align-items:center; border-right: 5px solid var(--danger);">
                         <div><b>${d.customer}</b><br><small>${new Date(d.date).toLocaleDateString()}</small></div>
                         <div style="text-align:left"><b style="color:var(--danger)">${d.amount}</b><br>
-                        <button onclick="Debts.payModal(${d.id})" style="border:none; color:var(--success); background:none; font-weight:bold; cursor:pointer">تسديد 💸</button></div>
+                        <button onclick="Debts.payModal('${d.id}')" style="border:none; color:var(--success); background:none; font-weight:bold; cursor:pointer">تسديد 💸</button></div>
                     </div>`).join('') || "لا يوجد ديون.";
             },
             payModal: (id) => {
@@ -443,7 +460,7 @@
                               <input type="number" id="pay-amount-input" class="form-control" placeholder="المبلغ المراد تسديده الآن">`;
                 UI.openModal("تسديد دين", html, () => Debts.processPay(id));
             },
-            processPay: (id) => {
+            processPay: async (id) => {
                 const paid = parseInt(document.getElementById('pay-amount-input').value);
                 if(!paid || paid <= 0) return alert("أدخل مبلغاً صالحاً");
                 
@@ -451,23 +468,23 @@
                 d.amount -= paid;
 
                 if(d.amount <= 0) {
+                    await deleteDoc(doc(db, "debts", id));
                     DB.debts = DB.debts.filter(x => x.id !== id);
                     alert("تم تسديد الدين بالكامل");
                 } else {
+                    await updateDoc(doc(db, "debts", id), { amount: d.amount });
                     alert(`تم خصم المبلغ. المتبقي: ${d.amount}`);
                 }
-
-                sync(); Debts.render(); UI.updateDash(); UI.closeModal();
+                Debts.render(); UI.updateDash(); UI.closeModal();
             }
         };
 
-        // --- 6. المخزن والموظفين (تم تحديثه لإضافة حذف الموظف) ---
-        const Inv = {
+        window.Inv = {
             render: () => {
                 document.getElementById('inv-items-list').innerHTML = DB.products.map(p => `
                     <div class="card" style="display:flex; justify-content:space-between; align-items:center">
                         <div><b>${p.name}</b> (${p.stock} قطعة)<br><small>شراء: ${p.costPrice} | بيع: ${p.sellPrice}</small></div>
-                        <button class="btn" style="width:auto; color:var(--danger)" onclick="Inv.del(${p.id})"><i class="fas fa-trash"></i></button>
+                        <button class="btn" style="width:auto; color:var(--danger)" onclick="Inv.del('${p.id}')"><i class="fas fa-trash"></i></button>
                     </div>`).join('');
             },
             openAddModal: () => {
@@ -477,20 +494,35 @@
                            <input type="number" id="p-stock-in" class="form-control" placeholder="الكمية">`;
                 UI.openModal("مادة جديدة", h, Inv.save);
             },
-            save: () => {
-                const n = document.getElementById('p-name-in').value, cp = parseInt(document.getElementById('p-cost-in').value), sp = parseInt(document.getElementById('p-sell-in').value), s = parseInt(document.getElementById('p-stock-in').value);
-                if(n && sp) { DB.products.push({id: Date.now(), name: n, costPrice: cp, sellPrice: sp, stock: s}); sync(); Inv.render(); POS.render(); UI.closeModal(); }
+            save: async () => {
+                const n = document.getElementById('p-name-in').value;
+                const cp = parseInt(document.getElementById('p-cost-in').value);
+                const sp = parseInt(document.getElementById('p-sell-in').value);
+                const s = parseInt(document.getElementById('p-stock-in').value);
+                
+                if(n && sp) {
+                    const newProd = { name: n, costPrice: cp, sellPrice: sp, stock: s };
+                    const docRef = await addDoc(collection(db, "products"), newProd);
+                    DB.products.push({ id: docRef.id, ...newProd });
+                    Inv.render(); POS.render(); UI.closeModal(); 
+                }
             },
-            del: (id) => { if(confirm("حذف المادة؟")) { DB.products = DB.products.filter(x=>x.id!==id); sync(); Inv.render(); POS.render(); } }
+            del: async (id) => { 
+                if(confirm("حذف المادة؟")) { 
+                    await deleteDoc(doc(db, "products", id));
+                    DB.products = DB.products.filter(x => x.id !== id);
+                    Inv.render(); POS.render(); 
+                } 
+            }
         };
 
-        const Users = {
+        window.Users = {
             render: () => { 
                 document.getElementById('staff-items-list').innerHTML = DB.users.map(u => `
                     <div class="card" style="display:flex; justify-content:space-between; align-items:center; padding:10px; margin-bottom:5px">
                         <div>${u.name} <small>(${u.role})</small></div>
                         ${u.role !== 'admin' ? 
-                          `<button class="btn" style="width:auto; background:var(--danger); color:white; padding:5px 10px; font-size:0.7rem" onclick="Users.delete(${u.id})">حذف</button>` 
+                          `<button class="btn" style="width:auto; background:var(--danger); color:white; padding:5px 10px; font-size:0.7rem" onclick="Users.delete('${u.id}')">حذف</button>` 
                           : '<i class="fas fa-shield-alt" style="color:var(--primary)"></i>'}
                     </div>
                 `).join(''); 
@@ -499,19 +531,26 @@
                 const h = `<input id="u-name-in" class="form-control" placeholder="الاسم الكامل"><input id="u-user-in" class="form-control" placeholder="اسم الدخول"><input id="u-pass-in" class="form-control" placeholder="كلمة المرور">`;
                 UI.openModal("موظف جديد", h, Users.save);
             },
-            save: () => {
+            save: async () => {
                 const n = document.getElementById('u-name-in').value, u = document.getElementById('u-user-in').value, p = document.getElementById('u-pass-in').value;
-                if(n && u && p) { DB.users.push({id: Date.now(), name: n, user: u, pass: p, role: 'staff'}); sync(); Users.render(); UI.closeModal(); }
+                if(n && u && p) { 
+                    const newUser = { name: n, user: u, pass: p, role: 'staff' };
+                    const docRef = await addDoc(collection(db, "users"), newUser);
+                    DB.users.push({ id: docRef.id, ...newUser });
+                    Users.render(); UI.closeModal(); 
+                }
             },
-            // دالة حذف الموظف الجديدة
-            delete: (id) => {
+            delete: async (id) => {
                 if(confirm("هل أنت متأكد من حذف هذا الموظف؟")) {
+                    await deleteDoc(doc(db, "users", id));
                     DB.users = DB.users.filter(u => u.id !== id);
-                    sync();
                     Users.render();
                 }
             }
         };
+
+        // تشغيل التحميل
+        loadDataFromFirebase();
     </script>
 </body>
 </html>
